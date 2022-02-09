@@ -9,6 +9,8 @@
 You like OrgMode, but have to use markdown sometimes, open your markdown file in
 emacs, =M-x= =edit-as-org=, happy writing!
 
+![](https://s3.bmp.ovh/imgs/2022/02/4411a7373b3707e6.gif)
+
 * Features
 - Edit document as other format in a separate buffer, with changes commited back
   to original buffer
@@ -22,6 +24,11 @@ emacs, =M-x= =edit-as-org=, happy writing!
   - basically, markup language formats will works OK
 
 * Configuration
+
+Prerequisite
+
+- install [[https://pandoc.org][Pandoc]]
+- install [[https://github.com/Fanael/edit-indirect][edit-indirect]]
 
 Load package
 
@@ -42,7 +49,7 @@ Create custom command with =edit-as-format-edit=, examples:
 #+end_src
 
 * Key Bindings
-This package simply wraps [[https://github.com/Fanael/edit-indirect][edit-indirect]] and pandoc, it uses
+This package simply wraps edit-indirect and pandoc, it uses
 =edit-indirect-mode-map=, which resembles =org-src-mode-map=
 
 #+begin_quote
