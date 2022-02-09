@@ -1,6 +1,6 @@
-;;; edit-as-format.el --- Edit file as other format  -*- lexical-binding: t; -*-
+;;; edit-as-format.el --- Edit document as other format  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2022  
+;; Copyright (C) 2022
 
 ;; Author:  <jingxiaobing@gmail.com>
 ;; Keywords: org markdown
@@ -20,7 +20,7 @@
 
 ;;; Commentary:
 
-;; Edit file as other format, using pandoc
+;; Edit document as other format, using pandoc
 
 ;;; Code:
 (require 'edit-indirect)
@@ -28,13 +28,12 @@
 (defcustom edit-as-format-filters-folder
   (expand-file-name
    "filters" (file-name-directory (or buffer-file-name load-file-name)))
-  "Location of Lua filters for use with pandoc.
-If FITERS/backend.lua exists, it will automatically be used when backend is registered."
-  :type 'string
+  "Location of Lua filters for use with pandoc."
+  :type 'directory
   :group 'edit-as-format)
 
 (defcustom edit-as-format-pandoc-executable "pandoc"
-  "Pandoc executable"
+  "Pandoc executable."
   :type 'string
   :group 'edit-as-format)
 
@@ -44,45 +43,70 @@ If FITERS/backend.lua exists, it will automatically be used when backend is regi
 
 By default, all lua files starting with '_' in `edit-as-format-filters-folder'
 are used."
-  :type 'list
+  :type '(set string)
   :group 'edit-as-format)
 
-(defvar edit-as-format-formats
-  '(("org" . org)
-    ("markdown-github" . gfm)
-    ("rst" . rst)))
+(defun edit-as-format--pandoc-formats ()
+  "Get pandoc supported formats."
+  (unwind-protect
+      (with-temp-buffer
+        (let ((input-formats
+               (progn
+                 (call-process edit-as-format-pandoc-executable nil '(t nil) nil "--list-input-formats")
+                 (split-string (buffer-substring-no-properties 1 (point-max)))))
+              (output-formats
+               (progn
+                 (erase-buffer)
+                 (call-process edit-as-format-pandoc-executable nil '(t nil) nil "--list-output-formats")
+                 (split-string (buffer-substring-no-properties 1 (point-max))))))
+          (cl-intersection input-formats output-formats :test 'equal)))
+    '("org" "rst" "gfm")))
 
-(defvar edit-as-format-major-modes
-  '((org . org-mode)
-    (gfm . markdown-mode)))
+(defcustom edit-as-format-formats
+  (edit-as-format--pandoc-formats)
+  "Supported formats."
+  :type '(set string)
+  :group 'edit-as-format)
 
-(defun edit-as-format--get-buffer-format ()
-    "Get current buffer format"
+(defcustom edit-as-format-major-modes
+  '(("org" . org-mode)
+    ("gfm" . markdown-mode)
+    ("markdown" . markdown-mode)
+    ("markdown_github" . markdown-mode))
+  "Format to `major-mode' mapping."
+  :type '(alist :value-type symbol)
+  :group 'edit-as-format)
+
+(defun edit-as-format--guess-buffer-format ()
+  "Guess current buffer format."
   (let ((ext (file-name-extension (buffer-name))))
     (pcase ext
-      ((or "md" "markdown") 'gfm)
-      ("org" 'org)
-      ("rst" 'rst))))
+      ((or "md" "markdown") "gfm")
+      ("org" "org")
+      ("rst" "rst")
+      ((or "tex" "latex" "latex"))
+      (_ (progn (message "failed to guess buffer file format.") nil)))))
 
-(defun edit-as-format (format)
-  "Edit as format, choose format from prompt"
+(defun edit-as-format (tgt)
+  "Edit as format, choose target format TGT from prompt."
   (interactive
-   (list (alist-get (completing-read "Format: " edit-as-format-formats nil t)
-                    edit-as-format-formats nil nil #'equal)))
-  (edit-as-format--edit (edit-as-format--get-buffer-format) format))
+   (list (completing-read "Format: " edit-as-format-formats nil t)))
+  (edit-as-format-edit (edit-as-format--guess-buffer-format) tgt))
 
 (defun edit-as-format--convert-string (content src tgt)
-  "Convert string"
+  "Convert string CONTENT from SRC format to TGT format."
   (let* ((filters (mapcan (lambda (filter) (list "--lua-filter" filter))
                           edit-as-format-lua-filters))
-         (args (append filters (list "-f" (symbol-name src) "-t" (symbol-name tgt)))))
+         (args (append filters (list "-f" src "-t" tgt))))
     (with-temp-buffer
       (apply #'call-process-region content nil
              edit-as-format-pandoc-executable nil '(t nil) nil args)
       (buffer-substring-no-properties (point-min) (point-max)))))
 
+;; didn't find a way to convert buffer directly without affecting
+;; overlay, so convert string first
 (defun edit-as-format--convert-buffer (beg end src tgt)
-  "Convert buffer"
+  "Convert buffer region(BEG END) from SRC format to TGT format."
   (let* ((content (buffer-substring-no-properties beg end))
          (converted (edit-as-format--convert-string content src tgt))
          (beg-marker (copy-marker beg))
@@ -92,22 +116,27 @@ are used."
       (unless (string= converted (match-string 0))
         (replace-match converted t t)))))
 
-(defun edit-as-format--edit (src tgt)
-  "Edit buffer as other FORMAT"
+(defun edit-as-format-edit (src tgt)
+  "Edit buffer which is SRC format, as other TGT format."
   (let ((beg (if (use-region-p) (region-beginning) (point-min)))
         (end (if (use-region-p) (region-end) (point-max)))
-        (convert-format (lambda () (edit-as-format--convert-buffer (point-min) (point-max) src tgt)
-                          (when-let ((major-mode-func (alist-get tgt edit-as-format-major-modes)))
-                            (funcall major-mode-func))))
+        (convert-format
+         (lambda () (edit-as-format--convert-buffer (point-min) (point-max) src tgt)
+           (if-let ((mode-func (alist-get tgt edit-as-format-major-modes nil nil 'equal)))
+               (funcall mode-func)
+             (message "Cannot find major mode for `%s', please check `edit-as-format-major-modes'" tgt))))
         (restore-format (lambda (beg1 end1) (edit-as-format--convert-buffer beg1 end1 tgt src))))
+    (unless (and (member src edit-as-format-formats)
+                 (member tgt edit-as-format-formats))
+      (error "Format not recognized, src: %s, tgt: %s" src tgt))
     (add-hook 'edit-indirect-after-creation-hook convert-format nil 'local)
     (add-hook 'edit-indirect-after-commit-functions restore-format nil 'local)
     (edit-indirect-region beg end t)))
 
 (defun edit-as-org ()
-  "Edit as org mode"
+  "Edit as org mode."
   (interactive)
-  (edit-as-format--edit (edit-as-format--get-buffer-format) 'org))
+  (edit-as-format-edit (edit-as-format--guess-buffer-format) "org"))
 
 (provide 'edit-as-format)
 ;;; edit-as-format.el ends here

@@ -1,0 +1,80 @@
+#+STARTUP: showall
+#+TITLE: Edit As Format
+#+OPTIONS: num:nil ^:{} toc:nil
+
+* Introduction
+*Edit* document *as* other *format*, as long as your format is supported by
+[[https://pandoc.org/][Pandoc]].
+
+You like OrgMode, but have to use markdown sometimes, open your markdown file in
+emacs, =M-x= =edit-as-org=, happy writing!
+
+* Features
+- Edit document as other format in a separate buffer, with changes commited back
+  to original buffer
+- Handle selected region or whole buffer
+- =edit-as-org= edit current buffer as org document
+- =edit-as-format= prompt for target format
+- supported formats
+  - default format list use *intersection* of =pandoc --list-input-formats= and
+    =pandoc --list-output-formats=
+  - however, not all that list is supported, especially non-textual formats
+  - basically, markup language formats will works OK
+
+* Configuration
+
+Load package
+
+#+begin_src elisp
+(push "~/edit-as-format" load-path)
+(require 'edit-as-format)
+#+end_src
+
+Create custom command with =edit-as-format-edit=, examples:
+
+#+begin_src elisp
+(defun edit-org-as-markdown ()
+  (interactive)
+  (edit-as-format-edit "org" "gfm"))
+(defun edit-as-markdown ()
+  (interactive)
+  (edit-as-format-edit (completing-read "Format: " edit-as-format-formats nil t) "gfm")
+#+end_src
+
+* Key Bindings
+This package simply wraps [[https://github.com/Fanael/edit-indirect][edit-indirect]] and pandoc, it uses
+=edit-indirect-mode-map=, which resembles =org-src-mode-map=
+
+#+begin_quote
+C-c '    edit-indirect-commit
+C-c C-c  edit-indirect-commit
+C-c C-k  edit-indirect-abort
+C-x C-s  edit-indirect-save
+#+end_quote
+
+Bind key to =edit-as-format= =edit-as-org= for convenient access
+
+#+begin_src elisp
+(global-set-key (kbd "C-c e e") 'edit-as-format)
+(global-set-key (kbd "C-c e o") 'edit-as-org)
+#+end_src
+
+Optionally, unbind =edit-indirect-commit=, give ~C-c '~ back to
+=org-edit-special= in org-mode
+
+#+begin_src elisp
+(unbind-key "C-c '" edit-indirect-mode-map)
+#+end_src
+
+* Alternatives
+- [[https://github.com/tecosaur/org-pandoc-import][org-pandoc-import]] gives a rather complete solution, it has many good features,
+  in contrast, =edit-as-format= takes a simpler way: =pandoc + edit-indirect=
+  (and takes some code from =org-pandoc-import=, great thanks).
+
+* Known issues
+1. markdown redundant spaces, maybe write pandoc filter ?
+2. commands affects =markdown-edit-code-block=, because
+   =edit-indirect-after-commit-functions= keeps hooks that calls pandoc ,
+   =remove-hook= no use, what TODO?
+3. =edit-as-format= more than once on same buffer causes confusion, same reason
+   with 2
