@@ -116,22 +116,32 @@ are used."
       (unless (string= converted (match-string 0))
         (replace-match converted t t)))))
 
+(defun edit-as-format--restore-commited-buffer (beg end)
+  "Restore buffer format, called from parent-buffer."
+  (when-let* ((overlay (edit-indirect--search-for-edit-indirect beg end))
+              (indirect-buffer (overlay-get overlay 'edit-indirect-buffer))
+              (src (buffer-local-value 'edit-as-format--src indirect-buffer))
+              (tgt (buffer-local-value 'edit-as-format--tgt indirect-buffer)))
+    (edit-as-format--convert-buffer beg end tgt src)))
+
 (defun edit-as-format-edit (src tgt)
   "Edit buffer which is SRC format, as other TGT format."
   (let ((beg (if (use-region-p) (region-beginning) (point-min)))
         (end (if (use-region-p) (region-end) (point-max)))
-        (convert-format
-         (lambda () (edit-as-format--convert-buffer (point-min) (point-max) src tgt)
-           (if-let ((mode-func (alist-get tgt edit-as-format-major-modes nil nil 'equal)))
-               (funcall mode-func)
-             (message "Cannot find major mode for `%s', please check `edit-as-format-major-modes'" tgt))))
         (restore-format (lambda (beg1 end1) (edit-as-format--convert-buffer beg1 end1 tgt src))))
     (unless (and (member src edit-as-format-formats)
                  (member tgt edit-as-format-formats))
       (error "Format not recognized, src: %s, tgt: %s" src tgt))
-    (add-hook 'edit-indirect-after-creation-hook convert-format nil 'local)
-    (add-hook 'edit-indirect-after-commit-functions restore-format nil 'local)
-    (edit-indirect-region beg end t)))
+    (add-hook 'edit-indirect-after-commit-functions
+              'edit-as-format--restore-commited-buffer nil 'local)
+    (let ((indirect-buffer (edit-indirect-region beg end t)))
+      (with-current-buffer indirect-buffer
+        (edit-as-format--convert-buffer 1 (point-max) src tgt)
+        (if-let ((mode-func (alist-get tgt edit-as-format-major-modes nil nil 'equal)))
+            (funcall mode-func)
+          (message "Cannot find major mode for `%s', please check `edit-as-format-major-modes'" tgt))
+        (set (make-local-variable 'edit-as-format--src) src)
+        (set (make-local-variable 'edit-as-format--tgt) tgt)))))
 
 (defun edit-as-org ()
   "Edit as org mode."

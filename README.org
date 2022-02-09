@@ -46,10 +46,10 @@ This package simply wraps [[https://github.com/Fanael/edit-indirect][edit-indire
 =edit-indirect-mode-map=, which resembles =org-src-mode-map=
 
 #+begin_quote
-C-c '    edit-indirect-commit
-C-c C-c  edit-indirect-commit
-C-c C-k  edit-indirect-abort
-C-x C-s  edit-indirect-save
+- C-c '    edit-indirect-commit
+- C-c C-c  edit-indirect-commit
+- C-c C-k  edit-indirect-abort
+- C-x C-s  edit-indirect-save
 #+end_quote
 
 Bind key to =edit-as-format= =edit-as-org= for convenient access
@@ -72,9 +72,4 @@ Optionally, unbind =edit-indirect-commit=, give ~C-c '~ back to
   (and takes some code from =org-pandoc-import=, great thanks).
 
 * Known issues
-1. markdown redundant spaces, maybe write pandoc filter ?
-2. commands affects =markdown-edit-code-block=, because
-   =edit-indirect-after-commit-functions= keeps hooks that calls pandoc ,
-   =remove-hook= no use, what TODO?
-3. =edit-as-format= more than once on same buffer causes confusion, same reason
-   with 2
+- markdown redundant spaces, maybe write pandoc filter ?
