@@ -2,8 +2,12 @@
 
 ;; Copyright (C) 2022
 
-;; Author:  <jingxiaobing@gmail.com>
-;; Keywords: org markdown
+;; Author: Xiaobing Jing <jingxiaobing@gmail.com>
+;; Keywords: files, outlines, convenience
+;; Created: Feb 2022
+;; Version: 0.1
+;; Package-Requires: ((emacs "26.1") (edit-indirect "0.1.5"))
+;; URL: https://github.com/etern/edit-as-format
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -48,19 +52,19 @@ are used."
 
 (defun edit-as-format--pandoc-formats ()
   "Get pandoc supported formats."
-  (unwind-protect
-      (with-temp-buffer
-        (let ((input-formats
-               (progn
-                 (call-process edit-as-format-pandoc-executable nil '(t nil) nil "--list-input-formats")
-                 (split-string (buffer-substring-no-properties 1 (point-max)))))
-              (output-formats
-               (progn
-                 (erase-buffer)
-                 (call-process edit-as-format-pandoc-executable nil '(t nil) nil "--list-output-formats")
-                 (split-string (buffer-substring-no-properties 1 (point-max))))))
-          (cl-intersection input-formats output-formats :test 'equal)))
-    '("org" "rst" "gfm")))
+  (or (ignore-errors
+        (with-temp-buffer
+          (let ((input-formats
+                 (progn
+                   (call-process edit-as-format-pandoc-executable nil '(t nil) nil "--list-input-formats")
+                   (split-string (buffer-substring-no-properties 1 (point-max)))))
+                (output-formats
+                 (progn
+                   (erase-buffer)
+                   (call-process edit-as-format-pandoc-executable nil '(t nil) nil "--list-output-formats")
+                   (split-string (buffer-substring-no-properties 1 (point-max))))))
+            (cl-intersection input-formats output-formats :test 'equal))))
+      '("org" "rst" "gfm" "markdown")))
 
 (defcustom edit-as-format-formats
   (edit-as-format--pandoc-formats)
@@ -87,12 +91,6 @@ are used."
       ((or "tex" "latex" "latex"))
       (_ (progn (message "failed to guess buffer file format.") nil)))))
 
-(defun edit-as-format (tgt)
-  "Edit as format, choose target format TGT from prompt."
-  (interactive
-   (list (completing-read "Format: " edit-as-format-formats nil t)))
-  (edit-as-format-edit (edit-as-format--guess-buffer-format) tgt))
-
 (defun edit-as-format--convert-string (content src tgt)
   "Convert string CONTENT from SRC format to TGT format."
   (let* ((filters (mapcan (lambda (filter) (list "--lua-filter" filter))
@@ -106,7 +104,7 @@ are used."
 ;; didn't find a way to convert buffer directly without affecting
 ;; overlay, so convert string first
 (defun edit-as-format--convert-buffer (beg end src tgt)
-  "Convert buffer region(BEG END) from SRC format to TGT format."
+  "Convert buffer region BEG..END from SRC format to TGT format."
   (let* ((content (buffer-substring-no-properties beg end))
          (converted (edit-as-format--convert-string content src tgt))
          (beg-marker (copy-marker beg))
@@ -117,23 +115,23 @@ are used."
         (replace-match converted t t)))))
 
 (defun edit-as-format--restore-commited-buffer (beg end)
-  "Restore buffer format, called from parent-buffer."
+  "Restore buffer format, called from parent-buffer.
+BEG..END is the region to be handled."
   (when-let* ((overlay (edit-indirect--search-for-edit-indirect beg end))
               (indirect-buffer (overlay-get overlay 'edit-indirect-buffer))
               (src (buffer-local-value 'edit-as-format--src indirect-buffer))
               (tgt (buffer-local-value 'edit-as-format--tgt indirect-buffer)))
     (edit-as-format--convert-buffer beg end tgt src)))
 
-(defun edit-as-format-edit (src tgt)
+(defun edit-as-format--edit (src tgt)
   "Edit buffer which is SRC format, as other TGT format."
   (let ((beg (if (use-region-p) (region-beginning) (point-min)))
-        (end (if (use-region-p) (region-end) (point-max)))
-        (restore-format (lambda (beg1 end1) (edit-as-format--convert-buffer beg1 end1 tgt src))))
+        (end (if (use-region-p) (region-end) (point-max))))
     (unless (and (member src edit-as-format-formats)
                  (member tgt edit-as-format-formats))
       (error "Format not recognized, src: %s, tgt: %s" src tgt))
     (add-hook 'edit-indirect-after-commit-functions
-              'edit-as-format--restore-commited-buffer nil 'local)
+              #'edit-as-format--restore-commited-buffer nil 'local)
     (let ((indirect-buffer (edit-indirect-region beg end t)))
       (with-current-buffer indirect-buffer
         (edit-as-format--convert-buffer 1 (point-max) src tgt)
@@ -143,10 +141,24 @@ are used."
         (set (make-local-variable 'edit-as-format--src) src)
         (set (make-local-variable 'edit-as-format--tgt) tgt)))))
 
-(defun edit-as-org ()
+;;;###autoload
+(defun edit-as-format (&optional src tgt)
+  "Edit current buffer as other format.
+
+if SRC format is not provided, make a guess
+if TGT format is not provided, prompt for confirm."
+  (interactive)
+  (let ((src (if (null src) (edit-as-format--guess-buffer-format) src))
+        (tgt (if (null tgt)
+                 (completing-read "Format: " edit-as-format-formats nil t)
+               tgt)))
+    (edit-as-format--edit src tgt)))
+
+;;;###autoload
+(defun edit-as-format-org ()
   "Edit as org mode."
   (interactive)
-  (edit-as-format-edit (edit-as-format--guess-buffer-format) "org"))
+  (edit-as-format nil "org"))
 
 (provide 'edit-as-format)
 ;;; edit-as-format.el ends here
