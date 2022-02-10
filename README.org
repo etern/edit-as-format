@@ -6,8 +6,8 @@
 *Edit* document *as* other *format*, as long as your format is supported by
 [[https://pandoc.org/][Pandoc]].
 
-You like OrgMode, but have to use markdown sometimes, open your markdown file in
-emacs, =M-x= =edit-as-org=, happy writing!
+You love OrgMode, but have to use markdown sometimes, open your markdown file in
+emacs, =M-x= =edit-as-format-org=, happy writing!
 
 [[https://s3.bmp.ovh/imgs/2022/02/4411a7373b3707e6.gif]]
 
@@ -50,8 +50,8 @@ Custom commands can be created easily with =edit-as-format=, examples:
 #+end_src
 
 * Key Bindings
-This package simply wraps edit-indirect and pandoc, it uses
-=edit-indirect-mode-map=, which resembles =org-src-mode-map=
+This package uses *edit-indirect* for editing, the key binding in
+=edit-indirect-mode-map= resembles =org-src-mode-map=
 
 #+begin_quote
 - C-c '    edit-indirect-commit
