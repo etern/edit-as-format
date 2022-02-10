@@ -27,8 +27,8 @@ emacs, =M-x= =edit-as-org=, happy writing!
 
 Prerequisite
 
-- install [[https://pandoc.org][Pandoc]]
-- install [[https://github.com/Fanael/edit-indirect][edit-indirect]]
+- install [[https://pandoc.org/installing.html][Pandoc]], make it accessible from ~PATH~
+- install [[https://github.com/Fanael/edit-indirect][edit-indirect]], from Melpa: ~M-x~ ~package-install~ ~edit-indirect~
 
 Load package
 
