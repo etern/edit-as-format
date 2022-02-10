@@ -29,12 +29,15 @@
 ;;; Code:
 (require 'edit-indirect)
 
-(defcustom edit-as-format-filters-folder
-  (expand-file-name
-   "filters" (file-name-directory (or buffer-file-name load-file-name)))
-  "Location of Lua filters for use with pandoc."
-  :type 'directory
-  :group 'edit-as-format)
+(defgroup edit-as-format nil
+  "Edit document as other format"
+  :group 'editing)
+
+(defconst edit-as-format-filters-folder
+  (directory-file-name
+   (expand-file-name
+    "filters" (file-name-directory (or load-file-name buffer-file-name))))
+  "Location of Lua filters for use with pandoc.")
 
 (defcustom edit-as-format-pandoc-executable "pandoc"
   "Pandoc executable."
@@ -47,7 +50,7 @@
 
 By default, all lua files starting with '_' in `edit-as-format-filters-folder'
 are used."
-  :type '(set string)
+  :type '(repeat string)
   :group 'edit-as-format)
 
 (defun edit-as-format--pandoc-formats ()
@@ -69,7 +72,7 @@ are used."
 (defcustom edit-as-format-formats
   (edit-as-format--pandoc-formats)
   "Supported formats."
-  :type '(set string)
+  :type '(repeat string)
   :group 'edit-as-format)
 
 (defcustom edit-as-format-major-modes
@@ -123,6 +126,16 @@ BEG..END is the region to be handled."
               (tgt (buffer-local-value 'edit-as-format--tgt indirect-buffer)))
     (edit-as-format--convert-buffer beg end tgt src)))
 
+(defun edit-as-format--setup-indirect-buffer (src tgt buffer)
+  "Convert BUFFER from SRC to TGT, and let it remember these formats."
+  (with-current-buffer buffer
+    (edit-as-format--convert-buffer 1 (point-max) src tgt)
+    (if-let ((mode-func (alist-get tgt edit-as-format-major-modes nil nil 'equal)))
+        (funcall mode-func)
+      (message "Cannot find major mode for `%s', please check `edit-as-format-major-modes'" tgt))
+    (set (make-local-variable 'edit-as-format--src) src)
+    (set (make-local-variable 'edit-as-format--tgt) tgt)))
+
 (defun edit-as-format--edit (src tgt)
   "Edit buffer which is SRC format, as other TGT format."
   (let ((beg (if (use-region-p) (region-beginning) (point-min)))
@@ -132,14 +145,12 @@ BEG..END is the region to be handled."
       (error "Format not recognized, src: %s, tgt: %s" src tgt))
     (add-hook 'edit-indirect-after-commit-functions
               #'edit-as-format--restore-commited-buffer nil 'local)
-    (let ((indirect-buffer (edit-indirect-region beg end t)))
-      (with-current-buffer indirect-buffer
-        (edit-as-format--convert-buffer 1 (point-max) src tgt)
-        (if-let ((mode-func (alist-get tgt edit-as-format-major-modes nil nil 'equal)))
-            (funcall mode-func)
-          (message "Cannot find major mode for `%s', please check `edit-as-format-major-modes'" tgt))
-        (set (make-local-variable 'edit-as-format--src) src)
-        (set (make-local-variable 'edit-as-format--tgt) tgt)))))
+    (let ((buffer (edit-indirect-region beg end t)))
+      (condition-case err
+          (edit-as-format--setup-indirect-buffer src tgt buffer)
+        (error (with-current-buffer buffer
+                 (edit-indirect--abort)
+                 (message (error-message-string err))))))))
 
 ;;;###autoload
 (defun edit-as-format (&optional src tgt)
