@@ -143,6 +143,10 @@ BEG..END is the region to be handled."
     (unless (and (member src edit-as-format-formats)
                  (member tgt edit-as-format-formats))
       (error "Format not recognized, src: %s, tgt: %s" src tgt))
+    (when (= beg end) ;; for empty buffer
+      (goto-char end)
+      (insert "\n")
+      (setq end (1+ end)))
     (add-hook 'edit-indirect-after-commit-functions
               #'edit-as-format--restore-commited-buffer nil 'local)
     (let ((buffer (edit-indirect-region beg end t)))
