@@ -53,6 +53,12 @@ are used."
   :type '(repeat string)
   :group 'edit-as-format)
 
+(defvar edit-as-format--src nil
+  "Source format, buffer local in indirect-buffer.")
+
+(defvar edit-as-format--tgt nil
+  "Target format, buffer local in indirect-buffer.")
+
 (defun edit-as-format--pandoc-formats ()
   "Get pandoc supported formats."
   (or (ignore-errors
