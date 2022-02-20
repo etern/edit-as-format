@@ -29,13 +29,13 @@ emacs, =M-x= =edit-as-format-org=, happy writing!
 Prerequisite
 
 - install [[https://pandoc.org/installing.html][Pandoc]], make it accessible from ~PATH~
-- install [[https://github.com/Fanael/edit-indirect][edit-indirect]], from Melpa: ~M-x~ ~package-install~ ~edit-indirect~
 
-Load package
+Use package from Melpa
 
 #+begin_src elisp
-(push "~/edit-as-format" load-path)
-(require 'edit-as-format)
+(use-package edit-as-format
+  :ensure t
+  :bind ("C-c e e" . edit-as-format))
 #+end_src
 
 Custom commands can be created easily with =edit-as-format=, examples:
