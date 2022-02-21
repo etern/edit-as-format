@@ -28,6 +28,7 @@
 
 ;;; Code:
 (require 'edit-indirect)
+(eval-when-compile (require 'subr-x))
 
 (defgroup edit-as-format nil
   "Edit document as other format"
